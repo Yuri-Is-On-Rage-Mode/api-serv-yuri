@@ -1,0 +1,12 @@
+{
+    "name": "yuri-api-serv",
+    "version": "1.0.0",
+    "description": "Yuri Banking API Service",
+    "main": "functions/api.js",
+    "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": ["api", "netlify", "banking"],
+    "author": "",
+    "license": "ISC"
+  }
