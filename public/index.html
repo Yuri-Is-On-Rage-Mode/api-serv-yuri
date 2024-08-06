@@ -1,1 +1,117 @@
-<p>hi</p>
+<?php
+session_start();
+
+// Simulated database (in a real scenario, you'd use a proper database)
+$users = [
+    'user1' => ['password' => 'password1', 'balance' => 1000],
+    'user2' => ['password' => 'password2', 'balance' => 2000]
+];
+
+$transactions = [];
+
+function json_response($data) {
+    header('Content-Type: application/json');
+    echo json_encode($data, JSON_PRETTY_PRINT);
+    exit;
+}
+
+function check_login() {
+    if (!isset($_SESSION['user'])) {
+        json_response(['status' => 'error', 'message' => 'Not logged in']);
+    }
+}
+
+if (isset($_GET['action'])) {
+    $action = $_GET['action'];
+
+    switch ($action) {
+        case 'login':
+            if (preg_match('/^login\((.*?),(.*?)\)$/', $_GET['param'], $matches)) {
+                $username = $matches[1];
+                $password = $matches[2];
+                if (isset($users[$username]) && $users[$username]['password'] === $password) {
+                    $_SESSION['user'] = $username;
+                    setcookie('session_id', session_id(), time() + 3600, '/');
+                    json_response(['status' => 'success', 'message' => 'Logged in successfully']);
+                } else {
+                    json_response(['status' => 'error', 'message' => 'Invalid credentials']);
+                }
+            } else {
+                json_response(['status' => 'error', 'message' => 'Invalid login format']);
+            }
+            break;
+
+        case 'logout':
+            check_login();
+            session_destroy();
+            setcookie('session_id', '', time() - 3600, '/');
+            json_response(['status' => 'success', 'message' => 'Logged out successfully']);
+            break;
+
+        case 'transfer':
+            check_login();
+            if (preg_match('/^transfer\((.*?),(.*?)\)$/', $_GET['param'], $matches)) {
+                $recipient = $matches[1];
+                $amount = floatval($matches[2]);
+                if (isset($users[$recipient]) && $users[$_SESSION['user']]['balance'] >= $amount) {
+                    $users[$_SESSION['user']]['balance'] -= $amount;
+                    $users[$recipient]['balance'] += $amount;
+                    $transactions[] = [
+                        'from' => $_SESSION['user'],
+                        'to' => $recipient,
+                        'amount' => $amount,
+                        'timestamp' => time()
+                    ];
+                    json_response(['status' => 'success', 'message' => 'Transfer successful']);
+                } else {
+                    json_response(['status' => 'error', 'message' => 'Invalid recipient or insufficient funds']);
+                }
+            } else {
+                json_response(['status' => 'error', 'message' => 'Invalid transfer format']);
+            }
+            break;
+
+        case 'balance':
+            check_login();
+            $balance = $users[$_SESSION['user']]['balance'];
+            json_response(['status' => 'success', 'balance' => $balance]);
+            break;
+
+        case 'history':
+            check_login();
+            $user_transactions = array_filter($transactions, function($t) {
+                return $t['from'] === $_SESSION['user'] || $t['to'] === $_SESSION['user'];
+            });
+            json_response(['status' => 'success', 'transactions' => $user_transactions]);
+            break;
+
+        default:
+            json_response(['status' => 'error', 'message' => 'Unknown action']);
+    }
+} else {
+    // HTML output when no action is specified
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bank API Simulation</title>
+    </head>
+    <body>
+        <h1>Bank API Simulation</h1>
+        <p>Use the URL parameter "action" to specify the endpoint, and "param" for additional data.</p>
+        <p>Available actions:</p>
+        <ul>
+            <li>login(username,password)</li>
+            <li>logout</li>
+            <li>transfer(recipient,amount)</li>
+            <li>balance</li>
+            <li>history</li>
+        </ul>
+        <p>Example: www.websitename.com/bank.php?action=login&param=login(user1,password1)</p>
+    </body>
+    </html>
+    <?php
+}
+?>
